@@ -20,7 +20,7 @@ fn main() {
 
     for func in functions {
         println!(
-            "cargo:rustc-link-arg=/EXPORT:{}={}.{}",
+            "cargo:rustc-link-arg-cdylib=/EXPORT:{}={}.{}",
             func, "C:\\Windows\\System32\\version", func
         );
     }
