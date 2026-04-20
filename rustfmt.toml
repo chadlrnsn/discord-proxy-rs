@@ -1,0 +1,24 @@
+edition = "2024"
+
+max_width = 100
+use_small_heuristics = "Max"
+
+use_field_init_shorthand = true
+newline_style = "Native"
+
+tab_spaces = 4
+hard_tabs = false
+
+# Для Nightly (опционально, если будешь использовать cargo +nightly fmt)
+# unstable_features = true
+# condense_wildcard_suffixes = true
+# format_macro_matchers = true
+# wrap_comments = true
+# format_strings = true
+# imports_granularity = "Crate"
+# group_imports = "StdExternalCrate"
+
+
+# rustfmt.toml (stable 1.5+)
+imports_granularity = "Crate"      # Группирует по crate в дерево
+group_imports = "StdExternalCrate" # Std → External → Crate
