@@ -15,6 +15,13 @@ The tool intercepts process initialization and network calls to inject proxy set
 - **Zero Overhead**: Minimal impact on process startup time and runtime resource consumption.
 - **Robustness**: Improved handling of multi-process Electron architecture and race conditions during hook installation.
 
+## Advantages of PAC-based Implementation
+Compared to traditional socket-level hooking (often used in earlier Pascal/C++ implementations), this PAC-based approach offers:
+- **Native Efficiency**: Uses Chromium's built-in proxy engine, ensuring 100% compatibility with all internal Electron requests (HTTP, WebSockets, etc.).
+- **SSL/TLS Integrity**: Traffic is proxied at the application level, avoiding complex and unstable low-level interceptors that often interfere with encrypted connections.
+- **Protocol Flexibility**: Supports complex routing logic through JavaScript-based PAC scripts without rewriting binary hook logic.
+- **Stability**: Significantly reduces the risk of crashes and conflicts with antivirus software or other system-level network tools.
+
 ## Installation
 1. Compile the project using `cargo build`.
 2. Copy the resulting `version.dll` and the `drover.toml` configuration file to the following directory:
