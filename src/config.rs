@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use once_cell::sync::Lazy;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Default)]
@@ -20,11 +21,9 @@ pub struct ProxyConfig {
 pub struct Rule {
     #[serde(rename = "override")]
     pub override_action: Option<String>,
-    pub proxy: Option<String>,
+    pub proxy: Option<String>, // "on", "off"
     pub fallback: Option<String>,
 }
-
-use once_cell::sync::Lazy;
 
 pub static CONFIG: Lazy<Config> = Lazy::new(|| {
     let content = std::fs::read_to_string("drover.toml").unwrap_or_default();
@@ -32,10 +31,12 @@ pub static CONFIG: Lazy<Config> = Lazy::new(|| {
 });
 
 fn format_pac_proxy(addr: &str) -> String {
+    let addr = addr.trim();
     if addr.eq_ignore_ascii_case("DIRECT") {
         return "DIRECT".to_string();
     }
-    // Handle cases where the user might have already put PROXY/SOCKS
+
+    // If it's already a PAC format string
     if addr.starts_with("PROXY ") || addr.starts_with("SOCKS") {
         return addr.to_string();
     }
@@ -47,7 +48,6 @@ fn format_pac_proxy(addr: &str) -> String {
     } else if let Some(stripped) = addr.strip_prefix("http://") {
         format!("PROXY {}", stripped)
     } else {
-        // If no prefix, check if it looks like an IP:PORT and default to PROXY
         format!("PROXY {}", addr)
     }
 }
@@ -55,7 +55,6 @@ fn format_pac_proxy(addr: &str) -> String {
 pub fn generate_pac_script(config: &Config) -> String {
     let main_pac =
         config.proxy.main.as_deref().map(format_pac_proxy).unwrap_or_else(|| "DIRECT".to_string());
-
     let fallback_pac = config
         .proxy
         .fallback
@@ -63,36 +62,29 @@ pub fn generate_pac_script(config: &Config) -> String {
         .map(format_pac_proxy)
         .unwrap_or_else(|| "DIRECT".to_string());
 
-    let on_route = if !fallback_pac.eq_ignore_ascii_case("DIRECT") {
-        format!("{}; {}; DIRECT", main_pac, fallback_pac)
-    } else {
-        format!("{}; DIRECT", main_pac)
-    };
+    // Construct the standard "on" route: Main -> Fallback -> Direct
+    let mut on_route_parts = Vec::new();
+    if main_pac != "DIRECT" {
+        on_route_parts.push(main_pac.clone());
+    }
+    if fallback_pac != "DIRECT" {
+        on_route_parts.push(fallback_pac.clone());
+    }
+    on_route_parts.push("DIRECT".to_string());
+    let on_route = on_route_parts.join("; ");
 
     let mut script = String::new();
     script.push_str("function FindProxyForURL(url, host) {\n");
 
-    // Check for global rule "*"
-    if let Some(rule) = config.rules.get("*") {
-        if let Some(over) = &rule.override_action {
-            script.push_str(&format!("  return \"{}\";\n", format_pac_proxy(over)));
-            script.push_str("}\n");
-            return script;
-        }
-        if let Some(proxy_val) = &rule.proxy {
-            if proxy_val.eq_ignore_ascii_case("on") {
-                script.push_str(&format!("  return \"{}\";\n", on_route));
-                script.push_str("}\n");
-                return script;
-            }
-        }
-    }
+    // Process specific rules
+    let mut sorted_domains: Vec<_> = config.rules.keys().collect();
+    sorted_domains.sort_by_key(|d| std::cmp::Reverse(d.len())); // Match specific (longer) domains first
 
-    // Individual rules
-    for (domain, rule) in &config.rules {
+    for domain in sorted_domains {
         if domain == "*" {
             continue;
         }
+        let rule = &config.rules[domain];
 
         let condition = if domain.starts_with("*.") {
             format!("shExpMatch(host, \"{}\")", domain)
@@ -100,6 +92,7 @@ pub fn generate_pac_script(config: &Config) -> String {
             format!("host === \"{}\"", domain)
         };
 
+        // 1. Override has highest priority
         if let Some(over) = &rule.override_action {
             script.push_str(&format!(
                 "  if ({}) return \"{}\";\n",
@@ -109,32 +102,46 @@ pub fn generate_pac_script(config: &Config) -> String {
             continue;
         }
 
-        if let Some(proxy_val) = &rule.proxy {
-            if proxy_val.eq_ignore_ascii_case("on") {
+        // 2. Proxy On/Off
+        if let Some(p) = &rule.proxy {
+            if p.eq_ignore_ascii_case("on") {
                 script.push_str(&format!("  if ({}) return \"{}\";\n", condition, on_route));
                 continue;
-            } else if proxy_val.eq_ignore_ascii_case("off") {
+            } else if p.eq_ignore_ascii_case("off") {
                 script.push_str(&format!("  if ({}) return \"DIRECT\";\n", condition));
                 continue;
             }
         }
 
-        if let Some(fallb) = &rule.fallback {
-            script.push_str(&format!(
-                "  if ({}) return \"{}; {}\";\n",
-                condition,
-                main_pac,
-                format_pac_proxy(fallb)
-            ));
+        // 3. Custom Fallback for this rule
+        if let Some(f) = &rule.fallback {
+            let rule_fallback = format_pac_proxy(f);
+            let mut chain = vec![main_pac.clone()];
+            if rule_fallback != "DIRECT" {
+                chain.push(rule_fallback);
+            }
+            chain.push("DIRECT".to_string());
+            script.push_str(&format!("  if ({}) return \"{}\";\n", condition, chain.join("; ")));
         }
     }
 
-    // Default: if main proxy is set, use it for everything else too?
-    // User asked "why filter by domain". Let's make it the default if no rules matched.
-    if !main_pac.eq_ignore_ascii_case("DIRECT") {
-        script.push_str(&format!("  return \"{}\";\n", on_route));
+    // Default behavior (if no rules matched)
+    // Handle "*" rule as global default
+    if let Some(global_rule) = config.rules.get("*") {
+        if let Some(over) = &global_rule.override_action {
+            script.push_str(&format!("  return \"{}\";\n", format_pac_proxy(over)));
+        } else if let Some(p) = &global_rule.proxy {
+            if p.eq_ignore_ascii_case("off") {
+                script.push_str("  return \"DIRECT\";\n");
+            } else {
+                script.push_str(&format!("  return \"{}\";\n", on_route));
+            }
+        } else {
+            script.push_str(&format!("  return \"{}\";\n", on_route));
+        }
     } else {
-        script.push_str("  return \"DIRECT\";\n");
+        // Absolute default: Use the main/fallback chain
+        script.push_str(&format!("  return \"{}\";\n", on_route));
     }
 
     script.push_str("}\n");

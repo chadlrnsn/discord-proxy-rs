@@ -13,7 +13,6 @@ use retour::static_detour;
 use windows::Win32::System::Console::{AllocConsole, SetConsoleTitleW};
 #[cfg(debug_assertions)]
 use windows::Win32::System::Threading::GetCurrentProcessId;
-
 use windows::{
     Win32::{
         Foundation::HINSTANCE,

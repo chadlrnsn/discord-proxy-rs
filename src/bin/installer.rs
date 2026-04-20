@@ -108,8 +108,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn restart_discord(app_dir: &Path) {
-    use std::os::windows::process::CommandExt;
-    use std::process::Stdio;
+    use std::{os::windows::process::CommandExt, process::Stdio};
     const DETACHED_PROCESS: u32 = 0x00000008;
     const CREATE_NO_WINDOW: u32 = 0x08000000;
     const FLAGS: u32 = DETACHED_PROCESS | CREATE_NO_WINDOW;
