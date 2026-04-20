@@ -9,14 +9,18 @@ use std::{fs, os::windows::ffi::OsStrExt};
 use base64::Engine;
 use once_cell::sync::Lazy;
 use retour::static_detour;
+#[cfg(debug_assertions)]
+use windows::Win32::System::Console::{AllocConsole, SetConsoleTitleW};
+#[cfg(debug_assertions)]
+use windows::Win32::System::Threading::GetCurrentProcessId;
+
 use windows::{
     Win32::{
         Foundation::HINSTANCE,
         System::{
-            Console::{AllocConsole, SetConsoleTitleW},
             LibraryLoader::{GetModuleHandleA, GetProcAddress},
             SystemServices::DLL_PROCESS_ATTACH,
-            Threading::{CreateThread, GetCurrentProcessId, THREAD_CREATION_FLAGS},
+            Threading::{CreateThread, THREAD_CREATION_FLAGS},
         },
     },
     core::s,
