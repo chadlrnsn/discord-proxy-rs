@@ -1,3 +1,28 @@
+# Drover Configuration File
+# -------------------------
+
 [proxy]
+# Global default proxies.
+# Use prefix: socks5://, socks4://, http:// or just IP:PORT (defaults to HTTP)
 main = "socks5://127.0.0.1:1080"
-fallback = "http://127.0.0.1:2080"
+fallback = "127.0.0.1:8080"      # Used if main is unavailable
+
+[rules]
+# Format: "domain" = { proxy = "on/off", override = "proxy_addr", fallback = "proxy_addr" }
+
+# 1. Standard rules: use global proxy chain
+"*.discord.gg" = { proxy = "on" }
+"*.discordapp.com" = { proxy = "on" }
+"*.discord.media" = { proxy = "on" }
+"*.discordapp.net" = { proxy = "on" }
+"discord.com" = { proxy = "on" }
+
+# 2. Bypass: Always direct connection for these domains
+"*.doubleclick.net" = { proxy = "off" }
+"*.google-analytics.com" = { proxy = "off" }
+
+# 3. Override: Use specific proxy for internal gateways
+"gateway.discord.gg" = { override = "socks5://127.0.0.1:1081" }
+
+# 4. Global default (fallback for everything else)
+"*" = { proxy = "on" }
