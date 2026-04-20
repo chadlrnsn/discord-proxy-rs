@@ -1,5 +1,7 @@
 # discord-proxy-rs
 
+[**На русском языке**](README_RU.md)
+
 ## Description
 This project is a proxy DLL (`version.dll`) designed for the Discord desktop client. It acts as a bridge between the Electron-based client and local proxy tools (Clash, V2Ray, etc.). It enables full proxy support for Discord, which lacks native comprehensive proxy configuration options.
 
@@ -12,6 +14,13 @@ The tool intercepts process initialization and network calls to inject proxy set
 - **Developer Experience**: Offers a cleaner, maintainable codebase for current systems programming standards.
 - **Zero Overhead**: Minimal impact on process startup time and runtime resource consumption.
 - **Robustness**: Improved handling of multi-process Electron architecture and race conditions during hook installation.
+
+## Installation
+1. Compile the project using `cargo build`.
+2. Copy the resulting `version.dll` and the `drover.toml` configuration file to the following directory:
+   `%localappdata%/Discord/app-<version>/` (e.g., `app-1.0.9147`).
+3. Ensure the address and port in `drover.toml` match your local proxy server (Clash, V2Ray, etc.).
+4. Restart Discord.
 
 ## Roadmap
 - **Autonomous Operation**: Implementation of DPI bypass techniques based on the GoodbyeDPI logic to allow direct connection without external proxy clients.
